@@ -1,0 +1,6 @@
+@ServerForTest_HostAddress = http://localhost:5228
+
+GET {{ServerForTest_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
