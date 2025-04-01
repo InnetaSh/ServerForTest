@@ -1,4 +1,5 @@
-﻿using System.Data.SqlClient;
+﻿using System.Data;
+using System.Data.SqlClient;
 using System.Reflection.PortableExecutable;
 using System.Xml.Linq;
 using Microsoft.AspNetCore.Mvc;
@@ -59,7 +60,7 @@ namespace ServerForTest.Services
             {
                 connection.Open();
 
-                string query = "SELECT TestId, TestName,TimeSec FROM Tests WHERE CategoryId = @Id ";
+                string query = "SELECT TestId, TestName, TimeSec, Description, ImgSrc FROM Tests WHERE CategoryId = @Id ";
 
                 using (SqlCommand command = new SqlCommand(query, connection))
                 {
@@ -75,7 +76,8 @@ namespace ServerForTest.Services
                                 Id = reader.GetInt32(reader.GetOrdinal("TestId")),
                                 Title = reader.GetString(reader.GetOrdinal("TestName")),
                                 TimeSec = reader.GetInt32(reader.GetOrdinal("TimeSec")),
-
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                ImgSrc = reader.GetString(reader.GetOrdinal("ImgSrc")),
                             });
                         }
                     }
@@ -150,94 +152,55 @@ namespace ServerForTest.Services
             return answers;
         }
 
+        //-----------------------------------------------------------------------------
 
 
-        public void insertAllCategory(Category category)
+        public void LoadToDB(Admin admin)
         {
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
 
-                string query = "INSERT INTO Categories (CategoryName) VALUES (@CategoryName)";
-
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@CategoryName", category.Title);
-                    int rowsAffected = command.ExecuteNonQuery();
-                    if (rowsAffected > 0)
-                    {
-                        Console.WriteLine("Категория успешно добавлена.");
-                    }
-                    else
-                    {
-                        Console.WriteLine("Не удалось добавить категорию.");
-                    }
-                }
-            }
-           
-        }
-
-        public void insertAllTest(Category category, Test test)
-        {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-
-              
                 using (SqlTransaction transaction = connection.BeginTransaction())
                 {
                     try
                     {
-                        
-                        string checkCategoryQuery = "SELECT COUNT(*) FROM Categories WHERE CategoryName = @CategoryName";
-                        using (SqlCommand checkCommand = new SqlCommand(checkCategoryQuery, connection, transaction))
-                        {
-                            checkCommand.Parameters.AddWithValue("@CategoryName", category.Title);
-                            int count = (int)checkCommand.ExecuteScalar();
+                        ClearDatabase(connection, transaction);
 
-                            if (count > 1)
+                        foreach (var c in admin.Categories)
+                        {
+                            insertAllCategory(connection, transaction, c);
+                            var tests = c.Tests;
+                            if (tests != null && tests.Count > 0)
                             {
-                                Console.WriteLine("Ошибка: несколько категорий с таким названием.");
-                                return; 
+                                foreach (var t in tests)
+                                {
+                                    insertAllTest(connection, transaction, c, t);
+
+                                    var questions = t.Questions;
+                                    if (questions != null && questions.Count > 0)
+                                    {
+                                        foreach (var q in questions)
+                                        {
+                                            insertAllQuestion(connection, transaction, c, t, q);
+
+                                            var answers = q.Answers;
+                                            if (answers != null && answers.Count > 0)
+                                            {
+                                                foreach (var a in answers)
+                                                {
+                                                    insertAllAnswers(connection, transaction, c, t, q, a);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        string categoryIdQuery = "SELECT CategoryId FROM Categories WHERE CategoryName = @CategoryName";
-                        int categoryId;
-                        using (SqlCommand categoryCommand = new SqlCommand(categoryIdQuery, connection, transaction))
-                        {
-                            categoryCommand.Parameters.AddWithValue("@CategoryName", category.Title);
-                            categoryId = (int)categoryCommand.ExecuteScalar();
-                        }
-
-                        string deleteTestsQuery = "DELETE FROM Tests WHERE CategoryId = @CategoryId";
-                        using (SqlCommand deleteCommand = new SqlCommand(deleteTestsQuery, connection, transaction))
-                        {
-                            deleteCommand.Parameters.AddWithValue("@CategoryId", categoryId);
-                            deleteCommand.ExecuteNonQuery();
-                        }
-
-                        string insertTestQuery = "INSERT INTO Tests (CategoryId, TestName, TimeSec) " +
-                                                 "VALUES (@CategoryId, @TestName, @TimeSec)";
-
-                        using (SqlCommand insertCommand = new SqlCommand(insertTestQuery, connection, transaction))
-                        {
-                            insertCommand.Parameters.AddWithValue("@CategoryId", categoryId);
-                            insertCommand.Parameters.AddWithValue("@TestName", test.Title);
-                            insertCommand.Parameters.AddWithValue("@TimeSec", test.TimeSec);
-                            int rowsAffected = insertCommand.ExecuteNonQuery();
-
-                            if (rowsAffected > 0)
-                            {
-                                Console.WriteLine("Тест успешно добавлен.");
-                            }
-                            else
-                            {
-                                Console.WriteLine("Не удалось добавить тест.");
-                            }
-                        }
-
+                      
                         transaction.Commit();
+                        Console.WriteLine("Данные успешно добавлены.");
                     }
                     catch (Exception ex)
                     {
@@ -247,109 +210,156 @@ namespace ServerForTest.Services
                 }
             }
         }
-        public void insertAllQuestion(Category category,Test test,Question question)
+
+        public void ClearDatabase(SqlConnection connection, SqlTransaction transaction)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            string deleteAnswersQuery = "DELETE FROM Answers";
+            using (SqlCommand deleteCommand = new SqlCommand(deleteAnswersQuery, connection, transaction))
             {
-                connection.Open();
+                deleteCommand.ExecuteNonQuery();
+            }
 
-                using (SqlTransaction transaction = connection.BeginTransaction())
+        
+            string deleteTestsQuery = "DELETE FROM Tests";
+            using (SqlCommand deleteCommand = new SqlCommand(deleteTestsQuery, connection, transaction))
+            {
+                deleteCommand.ExecuteNonQuery();
+            }
+
+            string deleteCategoriesQuery = "DELETE FROM Categories";
+            using (SqlCommand deleteCommand = new SqlCommand(deleteCategoriesQuery, connection, transaction))
+            {
+                deleteCommand.ExecuteNonQuery();
+            }
+
+            string deleteQuestionsQuery = "DELETE FROM Questions";
+            using (SqlCommand deleteCommand = new SqlCommand(deleteQuestionsQuery, connection, transaction))
+            {
+                deleteCommand.ExecuteNonQuery();
+            }
+            Console.WriteLine("База данных успешно очищена.");
+        }
+
+
+
+
+        public void insertAllCategory(SqlConnection connection, SqlTransaction transaction, Category category)
+        {
+            string insertCategoryQuery = "INSERT INTO Categories (CategoryName) VALUES (@CategoryName); SELECT SCOPE_IDENTITY();";
+            using (SqlCommand insertCommand = new SqlCommand(insertCategoryQuery, connection, transaction))
+            {
+                insertCommand.Parameters.AddWithValue("@CategoryName", category.Title);
+                //int categoryId = Convert.ToInt32(insertCommand.ExecuteScalar());
+                int rowsAffected = insertCommand.ExecuteNonQuery();
+                if (rowsAffected > 0)
                 {
-                    try
-                    {
-                       
-                        string deleteQuery = "DELETE FROM Questions";
+                    Console.WriteLine("Категория успешно добавлена.");
+                }
+                else
+                {
+                    Console.WriteLine("Не удалось добавить категорию.");
+                }
+            }
+        }
+    
 
-                       
-                        using (SqlCommand deleteCommand = new SqlCommand(deleteQuery, connection, transaction))
-                        {
-                            deleteCommand.ExecuteNonQuery();
-                        }
+        public void insertAllTest(SqlConnection connection, SqlTransaction transaction, Category category, Test test)
+        {
+            string insertTestQuery = "INSERT INTO Tests (CategoryId, TestName, TimeSec, Description, ImgSrc) VALUES ((SELECT TOP 1 CategoryId FROM Categories WHERE CategoryName = @CategoryName), @TestName, @TimeSec, @Description, @ImgSrc)";
+            using (SqlCommand insertCommand = new SqlCommand(insertTestQuery, connection, transaction))
+            {
+                insertCommand.Parameters.AddWithValue("@CategoryName", category.Title); 
+                insertCommand.Parameters.AddWithValue("@TestName", test.Title);
+                insertCommand.Parameters.AddWithValue("@TimeSec", test.TimeSec);
+                if (string.IsNullOrEmpty(test.Description))
+                {
+                    insertCommand.Parameters.Add("@Description", SqlDbType.NVarChar).Value = DBNull.Value;
+                }
+                else
+                {
+                    insertCommand.Parameters.Add("@Description", SqlDbType.NVarChar).Value = test.Description;
+                }
 
-                   
-                        string insertQuery = "INSERT INTO Questions (TestId, QuestionText, Weight, ImagePath, IsMultiAnswers) " +
-                                             "VALUES (@TestId, @QuestionText, @Weight)";
+                if (string.IsNullOrEmpty(test.ImgSrc))
+                {
+                    insertCommand.Parameters.Add("@ImgSrc", SqlDbType.NVarChar).Value = DBNull.Value;
+                }
+                else
+                {
+                    insertCommand.Parameters.Add("@ImgSrc", SqlDbType.NVarChar).Value = test.ImgSrc;
+                }
+                int rowsAffected = insertCommand.ExecuteNonQuery();
 
-                       
-                        using (SqlCommand insertCommand = new SqlCommand(insertQuery, connection, transaction))
-                        {
-                            insertCommand.Parameters.AddWithValue("@TestId", test.Id);
-                            insertCommand.Parameters.AddWithValue("@QuestionText", question.QuestionText);
-                            insertCommand.Parameters.AddWithValue("@Weight", question.Weight);
-                            insertCommand.Parameters.AddWithValue("@ImagePath", question.ImagePath);
-                            insertCommand.Parameters.AddWithValue("@IsMultiAnswers", question.IsMultiAnswers);
-                            insertCommand.ExecuteNonQuery();
-                        }
-
-                     
-                        transaction.Commit();
-                        Console.WriteLine("Все данные были успешно перезаписаны.");
-                    }
-                    catch (Exception ex)
-                    {
-                       
-                        transaction.Rollback();
-                        Console.WriteLine("Ошибка при перезаписи данных: " + ex.Message);
-                    }
+                if (rowsAffected > 0)
+                {
+                    Console.WriteLine("Тест успешно добавлен.");
+                }
+                else
+                {
+                    Console.WriteLine("Не удалось добавить тест.");
                 }
             }
         }
 
-        public void insertAllAnswers(Category category, Test test, Question question, Answer answer)
+
+        public void insertAllQuestion(SqlConnection connection, SqlTransaction transaction, Category category, Test test, Question question)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            object imagePathParam = string.IsNullOrEmpty(question.ImagePath) ? DBNull.Value : (object)question.ImagePath;
+
+            string insertQuery = "INSERT INTO Questions (TestId, QuestionText, Weight, ImagePath, IsMultiAnswers) " +
+                                             "VALUES ((SELECT TOP 1 TestId FROM Tests WHERE TestName = @TestName), @QuestionText, @Weight, @ImagePath, @IsMultiAnswers)";
+
+            using (SqlCommand insertCommand = new SqlCommand(insertQuery, connection, transaction))
             {
-                connection.Open();
+                insertCommand.Parameters.AddWithValue("@TestName", test.Title);
+                insertCommand.Parameters.AddWithValue("@QuestionText", question.QuestionText);
+                insertCommand.Parameters.AddWithValue("@Weight", question.Weight);
+                insertCommand.Parameters.AddWithValue("@ImagePath", imagePathParam);
+                insertCommand.Parameters.AddWithValue("@IsMultiAnswers", question.IsMultiAnswers);
+                
+            
+            int rowsAffected = insertCommand.ExecuteNonQuery();
 
-                using (SqlTransaction transaction = connection.BeginTransaction())
+                if (rowsAffected > 0)
                 {
-                    try
-                    {
-                        string getQuestionIdQuery = "SELECT TOP 1 QuestionId FROM Questions WHERE QuestionText = @QuestionText";
-                        int questionId;
-                        using (SqlCommand getQuestionIdCommand = new SqlCommand(getQuestionIdQuery, connection, transaction))
-                        {
-                            getQuestionIdCommand.Parameters.AddWithValue("@QuestionText", question.QuestionText);
-                            questionId = (int)getQuestionIdCommand.ExecuteScalar();
-                        }
-
-                        string deleteAnswersQuery = "DELETE FROM Answers WHERE QuestionId = @QuestionId";
-                        using (SqlCommand deleteCommand = new SqlCommand(deleteAnswersQuery, connection, transaction))
-                        {
-                            deleteCommand.Parameters.AddWithValue("@QuestionId", questionId); 
-                            deleteCommand.ExecuteNonQuery();
-                        }
-
-                        string insertAnswerQuery = "INSERT INTO Answers (QuestionId, AnswerText, IsCorrect) " +
-                                                   "VALUES (@QuestionId, @AnswerText, @IsCorrect)";
-                        using (SqlCommand insertCommand = new SqlCommand(insertAnswerQuery, connection, transaction))
-                        {
-                            insertCommand.Parameters.AddWithValue("@QuestionId", questionId);
-                            insertCommand.Parameters.AddWithValue("@AnswerText", answer.AnswerText);
-                            insertCommand.Parameters.AddWithValue("@IsCorrect", answer.IsCorrect);
-
-                            int rowsAffected = insertCommand.ExecuteNonQuery();
-                            if (rowsAffected > 0)
-                            {
-                                Console.WriteLine("Ответ успешно добавлен.");
-                            }
-                            else
-                            {
-                                Console.WriteLine("Не удалось добавить ответ.");
-                            }
-                        }
-
-                        transaction.Commit();
-                    }
-                    catch (Exception ex)
-                    {
-                        transaction.Rollback();
-                        Console.WriteLine("Ошибка при добавлении ответа: " + ex.Message);
-                    }
+                    Console.WriteLine("Вопрос успешно добавлен.");
+                }
+                else
+                {
+                    Console.WriteLine("Не удалось добавить вопрос.");
                 }
             }
+        }
+
+
+        public void insertAllAnswers(SqlConnection connection, SqlTransaction transaction, Category category, Test test, Question question, Answer answer)
+        {
+
+            string insertAnswerQuery = "INSERT INTO Answers (QuestionId, AnswerText, IsCorrect) " +
+                                                   "VALUES ((SELECT TOP 1 QuestionId FROM Questions WHERE QuestionText = @QuestionText), @AnswerText, @IsCorrect)";
+            using (SqlCommand insertCommand = new SqlCommand(insertAnswerQuery, connection, transaction))
+            {
+                insertCommand.Parameters.AddWithValue("@QuestionText", question.QuestionText);
+                insertCommand.Parameters.AddWithValue("@AnswerText", answer.AnswerText);
+                insertCommand.Parameters.AddWithValue("@IsCorrect", answer.IsCorrect);
+
+                int rowsAffected = insertCommand.ExecuteNonQuery();
+                if (rowsAffected > 0)
+                {
+                    Console.WriteLine("Ответ успешно добавлен.");
+                }
+                else
+                {
+                    Console.WriteLine("Не удалось добавить ответ.");
+                }
+            }
+
         }
     }
+
+        //-------------------------------------------------------------
+
+     
 }
 
 

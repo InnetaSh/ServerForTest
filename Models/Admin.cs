@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace ServerForTest.Models
 {
-    public class Admin
+    public class Admin : User
     {
-        public String? Name { get; set; }
+      
         public List<Category> Categories { get; set; } = new List<Category>();
 
     }

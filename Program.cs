@@ -47,12 +47,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+
+
+
+
 builder.Services.AddAuthorization();
 
 
 
 builder.Services.AddControllers();
 builder.Services.AddSingleton<AdminService>();
+builder.Services.AddSingleton<LoginService>();
+builder.Services.AddSingleton<UserService>();
+builder.Services.AddSingleton<TokenService>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

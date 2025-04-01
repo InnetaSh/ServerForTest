@@ -12,5 +12,8 @@ namespace ServerForTest.Models
         public String? Title { get; set; }
         public List<Question> Questions { get; set; } = new List<Question>();
         public int TimeSec { get; set; }
+
+        public String? Description { get; set; }
+        public String? ImgSrc { get; set; }
     }
 }
