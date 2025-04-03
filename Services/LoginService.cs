@@ -68,7 +68,7 @@ namespace ServerForTest.Services
             {
                 connection.Open();
 
-                string query = "INSERT INTO Users (Username, PasswordHash, Email, Token) OUTPUT INSERTED.UserId, INSERTED.Username, INSERTED.Token VALUES (@Username, @PasswordHash, @Email, @Token)";
+                string query = "INSERT INTO Users (Username, PasswordHash, Email, Token, CountHeart) OUTPUT INSERTED.UserId, INSERTED.Username, INSERTED.Token VALUES (@Username, @PasswordHash, @Email, @Token,5)";
 
                 using (SqlCommand command = new SqlCommand(query, connection))
                 {
@@ -85,6 +85,7 @@ namespace ServerForTest.Services
                             fitUser.Id = reader["UserId"].ToString();
                             fitUser.Name = reader["Username"].ToString();
                             fitUser.Token = reader["Token"].ToString();
+                            fitUser.CountHeart = Convert.ToInt32(reader["CountHeart"]);
                         }
                         else
                         {
@@ -154,7 +155,7 @@ namespace ServerForTest.Services
                 try
                 {
                     connection.Open();
-                    string query = "SELECT UserId, Username, PasswordHash,Token FROM Users WHERE Username = @Username";
+                    string query = "SELECT UserId, Username, PasswordHash, Token, CountHeart,TimeOfLastHeart FROM Users WHERE Username = @Username";
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@Username", user.Name);
@@ -172,6 +173,8 @@ namespace ServerForTest.Services
                                     fitUser.Id = reader["UserId"].ToString();
                                     fitUser.Name = reader["Username"].ToString();
                                     fitUser.Token = reader["Token"].ToString();
+                                    fitUser.CountHeart = Convert.ToInt32(reader["CountHeart"]);
+                                    fitUser.TimeOfLastHeart = reader["TimeOfLastHeart"].ToString();
                                 }
                                 else
                                 {
@@ -193,6 +196,9 @@ namespace ServerForTest.Services
             return fitUser;
 
         }
+
+
+
 
         public User UpdateUser(string name, string token)
         {
@@ -231,6 +237,11 @@ namespace ServerForTest.Services
 
             return user;
         }
+
+
+        
+
+
 
         public Admin UpdateAdmin(string name, string token)
         {

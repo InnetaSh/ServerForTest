@@ -15,7 +15,10 @@ namespace ServerForTest.Models
 
         public string? Token { get; set; }
 
-        public List<UserInfo> userInfos { get; set; } = new List<UserInfo>();
+        public int CountHeart { get; set; }
+
+        public string? TimeOfLastHeart { get; set; }
+        public List<UserInfo> UserInfos { get; set; } = new List<UserInfo>();
     }
 
 
@@ -27,6 +30,8 @@ namespace ServerForTest.Models
         public int Points { get; set; }
 
         public int Time { get; set; }
+
+       
         public string? Token { get; set; }
     }
 }

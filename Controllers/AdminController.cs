@@ -138,7 +138,9 @@ namespace ServerForTest.Controllers
                     var response = new User
                     {
                         Token = token,
-                        Name = updatedUser.Name
+                        Name = updatedUser.Name,
+                        CountHeart = fituser.CountHeart,
+                        TimeOfLastHeart = fituser.TimeOfLastHeart,
                     };
                     return Ok(response);
                 }
@@ -152,9 +154,66 @@ namespace ServerForTest.Controllers
 
 
 
+        [HttpPost("user/heart")]
+        public IActionResult SaveUserCountHeart([FromBody] User user)
+        {
+            if (user == null)
+            {
+                return BadRequest("Admin object is null.");
+            }
+            var fituser = _userService.FindUserByToken(user);
+            if (fituser != null)
+            {
+                var updatedUser = _userService.UpdateUserHeartCount(user.Token, user.CountHeart);
+                if (updatedUser != null)
+                {
+                    var response = new User
+                    {
+                        Name = updatedUser.Name,
+                        CountHeart = fituser.CountHeart,
+                    };
+                    return Ok(response);
+                }
+                return BadRequest("Не удалось обновить данные пользователя.");
+            }
+            else
+            {
+                return Unauthorized("Неверное имя пользователя или пароль.");
+            }
+        }
 
-            //----------------------------------------------------
-            [HttpPost("userInfo")]
+
+        [HttpPost("user/time")]
+        public IActionResult SaveUserTime([FromBody] User user)
+        {
+            if (user == null)
+            {
+                return BadRequest("Admin object is null.");
+            }
+            var fituser = _userService.FindUserByToken(user);
+            if (fituser != null)
+            {
+                var updatedUser = _userService.UpdateUserTime(user.Token, user.TimeOfLastHeart);
+                if (updatedUser != null)
+                {
+                    var response = new User
+                    {
+                        Name = updatedUser.Name,
+                        TimeOfLastHeart = fituser.TimeOfLastHeart,
+                    };
+                    return Ok(response);
+                }
+                return BadRequest("Не удалось обновить данные пользователя.");
+            }
+            else
+            {
+                return Unauthorized("Неверное имя пользователя или пароль.");
+            }
+        }
+
+
+        //----------------------------------------------------
+        [HttpPost("userInfo")]
         public IActionResult insertUserInfo([FromBody] UserInfo userInfo)
         {
             if (userInfo == null)
@@ -166,7 +225,30 @@ namespace ServerForTest.Controllers
             return Ok();
         }
 
-        
+
+
+        [HttpGet("user/userInfo")]
+        public IActionResult allUserInfoAoutTest(string? Token)
+        {
+            if (string.IsNullOrWhiteSpace(Token))
+            {
+                return BadRequest("Token is required.");
+            }
+
+            var userInfos = _userService.UserInfo(Token);
+
+            if (userInfos == null || !userInfos.Any())
+            {
+                return NotFound("No test information found for this user.");
+            }
+
+            return Ok(userInfos);
+        }
+
+        //---------------------------------------------------------
+
+
+
         [HttpGet("checkUsernameExists")]
         public IActionResult checkUsernameExists(string? name)
         {

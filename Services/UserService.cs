@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using ServerForTest.Models;
 using BCrypt.Net;
+using System.Security.Cryptography.X509Certificates;
 
 namespace ServerForTest.Services
 {
@@ -85,6 +86,176 @@ namespace ServerForTest.Services
                 Console.WriteLine("Ошибка: " + ex.Message);
             }
         }
+
+
+
+
+        public List<UserInfo> UserInfo(string? Token)
+        {
+            List<UserInfo> userInfos = new List<UserInfo>();
+
+            string query = @"
+                    SELECT 
+                        ui.UserInfoId AS Id,
+                        ui.TestId,
+                        t.TestName AS TestTitle,
+                        ui.CorrectAnswerCount,
+                        ui.Points,
+                        ui.Time,
+                        ui.Token
+                    FROM UserInfo ui
+                    LEFT JOIN Tests t ON ui.TestId = t.TestId
+                    LEFT JOIN Users u ON ui.UserId = u.UserId
+                    WHERE u.Token = @Token";
+
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Token", Token);
+
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            userInfos.Add(new UserInfo
+                            {
+                                Id = reader["Id"].ToString(),
+                                TestTitle = reader["TestTitle"].ToString(),
+                                CorrectAnswerCount = Convert.ToInt32(reader["CorrectAnswerCount"]),
+                                Points = Convert.ToInt32(reader["Points"]),
+                                Time = Convert.ToInt32(reader["Time"]),
+                                Token = reader["Token"].ToString()
+                            });
+                        }
+                    }
+                }
+            }
+
+            return userInfos;
+        }
+
+
+        public User FindUserByToken(User user)
+        {
+            var fitUser = new User();
+
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                try
+                {
+                    connection.Open();
+                    string query = "SELECT UserId, Username, Token, CountHeart FROM Users WHERE Token = @Token";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Token", user.Token);
+
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+
+                                fitUser.Id = reader["UserId"].ToString();
+                                fitUser.Name = reader["Username"].ToString();
+                                fitUser.Token = reader["Token"].ToString();
+                                fitUser.CountHeart = Convert.ToInt32(reader["CountHeart"]);
+                            }
+                            else
+                            {
+                                fitUser = null;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Ошибка подключения: {ex.Message}", "Ошибка");
+                }
+            }
+            return fitUser;
+
+        }
+
+
+        public User UpdateUserHeartCount(string Token, int countHeart)
+        {
+            User user = null;
+
+
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+
+                string query = "UPDATE  Users SET CountHeart = @CountHeart WHERE Token = @Token";
+
+
+
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Token", Token);
+                    command.Parameters.AddWithValue("@CountHeart", countHeart);
+
+                    int affectedRows = command.ExecuteNonQuery();
+
+                    if (affectedRows > 0)
+                    {
+                        user = new User
+                        {
+                            Token = Token,
+                            CountHeart = countHeart
+                        };
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Не удалось обновить данные пользователя.");
+                    }
+                }
+            }
+
+            return user;
+        }
+
+
+        public User UpdateUserTime(string Token, string time)
+        {
+            User user = null;
+
+
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+
+                string query = "UPDATE  Users SET TimeOfLastHeart = @TimeOfLastHeart WHERE Token = @Token";
+
+
+
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Token", Token);
+                    command.Parameters.AddWithValue("@TimeOfLastHeart", time);
+
+                    int affectedRows = command.ExecuteNonQuery();
+
+                    if (affectedRows > 0)
+                    {
+                        user = new User
+                        {
+                            Token = Token,
+                            TimeOfLastHeart = time
+                        };
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Не удалось обновить данные пользователя.");
+                    }
+                }
+            }
+
+            return user;
+        }
+
     }
 
 }

@@ -36,7 +36,7 @@ namespace ServerForTest.Services
 
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
-                        if (reader.Read())
+                        while (reader.Read())
                         {
                             categories.Add( new Category
                             {
@@ -68,7 +68,7 @@ namespace ServerForTest.Services
 
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
-                        if (reader.Read())
+                        while (reader.Read())
                         {
                             tests.Add(new Test
                             {
@@ -110,6 +110,7 @@ namespace ServerForTest.Services
                                 Id = reader.GetInt32(reader.GetOrdinal("QuestionId")),
                                 QuestionText = reader.GetString(reader.GetOrdinal("QuestionText")),
                                 Weight = reader.GetInt32(reader.GetOrdinal("Weight")),
+                                IsMultiAnswers = reader.GetBoolean(reader.GetOrdinal("IsMultiAnswers")),
                                 ImagePath = reader.IsDBNull(reader.GetOrdinal("ImagePath")) ? null : reader.GetString(reader.GetOrdinal("ImagePath"))
                             });
                         }
